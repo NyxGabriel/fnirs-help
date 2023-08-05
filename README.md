@@ -15,7 +15,7 @@ A very little bit more on the [Betas of GLM](https://www.youtube.com/watch?v=9VG
 
 Otherwise they take the value number 0,1,2,3... etc but always be careful when comparing estimates (betas) for conditions. Make you contrasts smart? 
 
-###### Modeling functions 
+##### Modeling functions 
 **HRF** - 2gamma in our case,  it is the canonical one 
 But there are options, also the paramters you pass the function (they are usually 6 params when modeling) are not the standard ones, which moves the peak and trough of the presumed BOLD response 
 **Boxcar** - square fucntion that imitates the start and end of the condition overtime
