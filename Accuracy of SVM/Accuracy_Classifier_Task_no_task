@@ -1,0 +1,332 @@
+#_________________READ ME_____________________
+# This code checks the accuracy of the MCPA analysis done with an SVM trained in TurboSatori
+#____  HOW TO USE____________
+# On an output file from TS with the subscript _4Script in the title. Or give the path to multiple subjects' data and the number of subjects and let it run automatically 
+#Details: 
+# As an input it takes the copied output from TurboSatori (TS).  TS outputs it in an internal GUI module; from there the user should copy the output and save it into a txt file with the relevant title
+# we suggest using the subject number, the type of signal used, the number of trials used and adding an _4Script
+# Example: S02_Results_(D)_Simulated_real_time_4Script 
+# !!!!!!!!ADDING the 4Script in the title is obligatory because that is how this scripts selects the correct file!!!!!!!!!!
+
+
+#______How it works_________
+# Goes to the given path of the text file you are trying to compute the accuracy from OR goest through the direcotry you have given in order to find the file and automatically do the compuatation for all subjects.
+#Compute the classification accuracy by checking the the pedicted 2 (as opposed to 1 - no task) 
+#is next to the lowest value computed 
+#then computes average classificantion accuracy
+#then outputs to a new file with the same name but without the 4script part
+# (oxy,deoxy, or both), all participants
+
+
+#LOOKS LIKE IT IS THE SAME AS READ_OUPUT
+
+# FIX all the paths and the redundancy overall present 
+import os
+
+
+#input function
+def get_user_input():
+	while True:
+		num_participants = input("Enter the number of participants: ")
+		while not is_integer(num_participants) or int(num_participants) <= 0:
+			print("Invalid number for participants. Please enter a positive integer.")
+			num_participants = input("Enter the number of participants: ")
+	    
+		if int(num_participants) ==1: 
+			choice = input("You are analyzing results form only 1 subject, do you want to use the script on one file or many files? (Enter 'one' or 'many'): ").lower()
+			if choice not in ['one', 'many']:
+				print("Invalid choice. Please enter 'one' or 'many'.")
+				continue
+
+			if choice == 'one':
+				file_path = input("Enter the path to the file: ")
+				while not os.path.isfile(file_path):
+					print("Invalid file path. Please enter a valid path to a file.")
+					file_path = input("Enter the path to the file: ")
+			else:
+				folder_path = input("Enter the path to the folder containing the files: ")
+				while not os.path.isdir(folder_path):
+					print("Invalid folder path. Please enter a valid path to a folder.")
+					folder_path = input("Enter the path to the folder containing the files: ")
+				file_path = folder_path  # For folder choice.
+		else: choice = 'many'
+
+
+		num_conditions = input("Enter the number of conditions: ")
+		while not is_integer(num_conditions) or int(num_conditions) <= 0:
+			print("Invalid number for conditions. Please enter a positive integer.")
+			num_conditions = input("Enter the number of conditions: ")
+
+
+		return choice, file_path, int(num_conditions), int(num_participants)
+
+
+#compute averages recusivley 
+def sranges(arr,n):
+	t = n
+	if t == 0:
+		return arr[t]
+	elif t<0:
+		return 0
+	
+	else:
+		return arr[t]+ sranges(arr,t-1)
+
+#check if input is an int
+def is_integer(value):
+    try:
+        int(value)
+        return True
+    except ValueError:
+        return False
+    
+
+#take the database path and the participants number to locate participant folder
+#in the folder it takes all files that have 4Script in them in order to work with them
+def LocateFiles(path, subject):
+	location = path 
+	sub_name = -1
+	use_files = []
+	if sub_name <=9:
+		sub_name = 'S0'+str(subject)
+	else:
+		sub_name = 'S'+str(subject)
+	location = os.path.join(path,sub_name)
+	
+	return location
+
+
+
+#it needs the number of participants, the path to the dataset up until where individual participant data starts
+def PathSubject(subject, path):
+
+	sub_name = subject
+	if sub_name <=9:
+		sub_name = 'S0'+str(subject+1)
+	else:
+		sub_name = 'S'+str(subject+1)
+
+		#print(file_names[f], f, path, counter)
+	path = os.path.join(path, sub_name)
+	
+	return path
+
+
+
+#put the data form the text file to a list 
+#indexing in list can be used from here on
+#each line is indexed independently
+#inside each string is indexed as well
+def OpenData(file_name):
+	with open(file_name,"r") as data:
+		results = [line.split() for line in data]
+	return results 
+
+# this creates the name of the output file which follows the same configuration as the original
+# I can change it, if you dont like it liek this 
+# maybe we should put the processed files in their own folder? or something else
+# easy change
+def CreateOutputFile(directory, file_name):
+	#remove_part = file_name.find('_4Script')
+	#outfile_name = file_name[0:remove_part] + file_name[remove_part + len('_4Script'):len(file_name)]
+	#return outfile_name
+	if "_4Script" not in file_name:
+		print(f"Warning: The file {file_name} doesn't contain the '_4Script' substring. Returning the original file name.")
+		return os.path.join(directory, file_name)
+    
+	outfile_name = file_name.replace("_4Script", "")
+	full_path = os.path.join(directory, outfile_name)
+	print(full_path)
+	return full_path
+	
+
+#read from the file information on a given index location
+# USE ONLY FOR NUMBERS - here they become floats from strings 
+def ReadData(data,search_value):
+	read = []
+	start = 0
+	for line in range(0,len(data)):
+		#print(start)
+		if data[line]==end_line:
+			start=0
+
+		if start == 1:
+			#print(data[line])
+			read.append(float(data[line][search_value]))
+			
+			#compare.append(float(data[line][value]))
+		if data[line]==start_line:
+			start = 1
+	
+	start=0
+	return read
+
+
+#finds the minimum value in the conditions 
+# and compares to desired results
+def FindMinValues(correct, compare, cond):
+	check = [0]*len(correct)
+	search_index = 0
+	min_value_index =-1
+	for i in range(0,len(correct)+1):
+
+		if i%cond == 0 and i!=0:
+			
+			min_value = min(compare[i-cond:i])
+			
+			min_value_index = compare.index(min_value)
+
+			for k in range(i-cond,i):
+			
+				if correct[k]==2:
+					search_index=k
+					
+			if search_index==min_value_index:
+				check[min_value_index] = 1
+				
+	return check 
+	
+
+#adds information to location in the data
+#takes start and end lines in order to estabish lenght of trial
+def AddNewInfo(results, check, start_line, end_line):
+	start=0
+	line=0
+	counter = 0
+	start_line_num=0
+	end_line_num=0
+	num_trials = []
+	
+	for line in range(0,len(results)):
+		
+		if results[line]==start_line: 
+			
+			start = 1	
+			start_line_num = line
+			
+
+		elif results[line]==end_line:
+			start=0
+			end_line_num = line
+			a= end_line_num- start_line_num-1
+			
+			num_trials.append(a)
+			
+		
+		if start == 1 and results[line]!=end_line and results[line]!=start_line:
+			results[line].append(str(check[counter])) 
+			
+			counter=counter+1
+		
+	return num_trials, results
+		
+#computes the accuracy of the classifier 		
+def ComputeClassificationAccuracy(num_trials,check,cond):
+	average = []
+	starts = 0
+
+	for it in range(len(num_trials)):
+		low_r = sranges(num_trials,it-1)
+		high_r = sranges(num_trials,it)
+		
+		av = (sum(check[low_r:high_r]))/(num_trials[it]/cond)
+	
+		average.append(str(av))
+	return average 
+
+
+#adds new lines to the text file
+#uses the end line to know where to add
+def AddnOutput(results,average,end_line,copy):
+	c3=0
+
+	for lie in range(0,len(results)):
+		#print(average[c3])
+		if results[lie]==end_line:
+			#the line uses all these tabsa in order to look good to the user and to be easy to find in the text 
+			avg = "Classification Accuracy: "+ "\t" + "\t"+ "\t"+ "\t"+ "\t"+ "\t"+ "\t"+ "\t"+ "\t"+ "\t"+ "\t"+ "\t"+ "\t"+average[c3]+"\n"
+			c3=c3+1
+			copy.write(avg)
+		else:
+			temp = " ".join(results[lie])
+			copy.write(temp)
+			copy.write('\n')
+
+def ProcessEachFile(filepath, num_conditions, answer_id, value, start_line, end_line): 
+	try:
+		participant_data = OpenData(filepath)	
+		copy = open(CreateOutputFile(os.path.dirname(filepath), os.path.basename(filepath)), 'w')
+
+		correct_answer = ReadData(participant_data, answer_id)
+		SVM_values = ReadData(participant_data, value)
+		Checked = FindMinValues(correct_answer, SVM_values, num_conditions)
+		num_trials, participant_data = AddNewInfo(participant_data, Checked, start_line, end_line)
+		classified = ComputeClassificationAccuracy(num_trials, Checked, num_conditions)
+		AddnOutput(participant_data, classified, end_line, copy)
+
+		copy.close()
+	except Exception as e:
+		print(f"Error processing file {filepath}. Error message: {e}")
+
+# In case you perfer you can be prompted to give this path location 
+# Very important
+#path = "C:/Users/Lenovo/surfdrive/Shared/N.Dobreva/BrainRobotElective/02_DataAnalysis/02a_fNIRSdata_MCPA (50)"  #\\S01\\S01_Results_(D)_Simulated_real_time_4Script_28Trials.txt'
+#path ="C:\Users\Lenovo\Desktop\S01_all_channels_Results_(O)_Simulated_real_time_4Script_36.txt"
+
+
+# These are specific to this type of file
+# I can make it more automatic if necessary 
+start_line = ['Starting', 'incremental', 'prediction...']
+end_line = ['Incremental', 'prediction', 'completed.']
+
+
+# Very importatn, given by user as well
+#how many conditions there are in each set
+# in our case it is how many options there are 
+#num_conditions = 4
+#how many participant's data do we run 
+#subjects = 1
+
+#Here I give the string indexes of the desires locations in the file
+answer_id = 11
+value = 14
+
+# Test the function
+choice, path, num_conditions, subjects = get_user_input()
+
+path = os.path.normpath(path)
+
+
+if subjects>1 :
+	for s in range(subjects):
+		each_path= PathSubject(s,path)
+		txt_files = [f for f in os.listdir(each_path) if f.endswith('4Script.txt') and os.path.isfile(os.path.join(each_path, f))]
+		if not txt_files:
+			print("No '4Script.txt' files found in the directory.")
+		
+		for file in txt_files:
+			full_path = os.path.join(each_path, file)
+			ProcessEachFile(full_path, num_conditions, answer_id, value, start_line, end_line)
+
+	
+if subjects==1:
+	if choice=="one" :
+		ProcessEachFile(path, num_conditions, answer_id, value, start_line, end_line)
+
+	if choice == "many":
+		txt_files = [f for f in os.listdir(path) if f.endswith('4Script.txt') and os.path.isfile(os.path.join(path, f))]
+		if not txt_files:
+			print("No '4Script.txt' files found in the directory.")
+		
+		for file in txt_files:
+			full_path = os.path.join(path, file)
+			ProcessEachFile(full_path, num_conditions, answer_id, value, start_line, end_line)
+
+
+
+			
+
+
+		
+	
+
